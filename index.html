@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VR Cube Game – 3 Cubes gleichzeitig</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+    <script>
+      let score = 0;
+
+      AFRAME.registerComponent('teleport-on-hover', {
+        init: function () {
+          const el = this.el;
+          let teleportTimeout = null;
+          let fadeInterval = null;
+          let progressInterval = null;
+
+          const soundEl = document.querySelector('#plopSound');
+          const progressBar = document.querySelector('#progressBar');
+
+          function getRandomColorRGB() {
+            return {
+              r: Math.floor(Math.random() * 256),
+              g: Math.floor(Math.random() * 256),
+              b: Math.floor(Math.random() * 256)
+            };
+          }
+
+          function rgbToString(rgb) {
+            return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+          }
+
+          function lightenColor(colorObj, amount = 10) {
+            return {
+              r: Math.min(255, colorObj.r + amount),
+              g: Math.min(255, colorObj.g + amount),
+              b: Math.min(255, colorObj.b + amount)
+            };
+          }
+
+          function updateScoreDisplay() {
+            const scoreText = document.querySelector('#scoreText');
+            scoreText.setAttribute('value', `Punkte: ${score}`);
+          }
+
+          // Start mit Zufallsfarbe
+          let currentColor = getRandomColorRGB();
+          el.setAttribute('color', rgbToString(currentColor));
+
+          el.addEventListener('mouseenter', () => {
+            let progress = 0;
+            progressBar.setAttribute('width', 0.001);
+            progressBar.setAttribute('visible', true);
+
+            // Ladebalken
+            progressInterval = setInterval(() => {
+              progress += 0.05;
+              progressBar.setAttribute('width', progress);
+            }, 100);
+
+            // Fading
+            fadeInterval = setInterval(() => {
+              currentColor = lightenColor(currentColor, 10);
+              el.setAttribute('color', rgbToString(currentColor));
+            }, 300);
+
+            teleportTimeout = setTimeout(() => {
+              soundEl.components.sound.playSound();
+              el.setAttribute('visible', false);
+              progressBar.setAttribute('visible', false);
+              clearInterval(progressInterval);
+
+              setTimeout(() => {
+                let randomX, randomY, randomZ;
+                const minDistance = 1;
+                const maxDistance = 10;
+                let distance = 0;
+
+                do {
+                  randomX = (Math.random() - 0.5) * 20;
+                  randomY = 1 + Math.random() * 3;
+                  randomZ = (Math.random() - 0.5) * 20;
+                  const dx = randomX;
+                  const dy = randomY - 1.6;
+                  const dz = randomZ;
+                  distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                } while (distance < minDistance || distance > maxDistance);
+
+                currentColor = getRandomColorRGB();
+                el.setAttribute('color', rgbToString(currentColor));
+                el.setAttribute('position', `${randomX} ${randomY} ${randomZ}`);
+                el.setAttribute('visible', true);
+
+                score++;
+                updateScoreDisplay();
+              }, 1000);
+            }, 2000);
+          });
+
+          el.addEventListener('mouseleave', () => {
+            clearTimeout(teleportTimeout);
+            clearInterval(fadeInterval);
+            clearInterval(progressInterval);
+            progressBar.setAttribute('visible', false);
+          });
+        }
+      });
+
+      // Dynamisch 3 Cubes erzeugen
+      AFRAME.registerComponent('spawn-cubes', {
+        init: function () {
+          const scene = this.el;
+          for (let i = 0; i < 2; i++) {
+            const box = document.createElement('a-box');
+            box.setAttribute('teleport-on-hover', '');
+            box.setAttribute('scale', '2 2 2');
+            box.setAttribute('rotation', '0 45 45');
+            box.setAttribute('animation__position', 'property: object3D.position.y; to: 2.2; dir: alternate; dur: 2000; loop: true');
+            box.setAttribute('animation__mouseenter', 'property: scale; to: 2.3 2.3 2.3; dur: 300; startEvents: mouseenter');
+            box.setAttribute('animation__mouseleave', 'property: scale; to: 2 2 2; dur: 300; startEvents: mouseleave');
+
+            // Zufällige Startposition
+            const x = (Math.random() - 0.5) * 10;
+            const y = 1 + Math.random() * 2;
+            const z = (Math.random() - 0.5) * 10;
+            box.setAttribute('position', `${x} ${y} ${z}`);
+
+            scene.appendChild(box);
+          }
+        }
+      });
+    </script>
+  </head>
+
+  <body>
+    <a-scene spawn-cubes vr-mode-ui="enabled: true">
+      <a-assets>
+        <audio id="plopAudio" src="plop.wav"></audio>
+      </a-assets>
+
+      <a-sound id="plopSound" src="#plopAudio" autoplay="false" position="0 2 0"></a-sound>
+
+      <!-- Kamera mit HUD -->
+      <a-entity id="rig" position="0 1.6 0" movement-controls>
+        <a-entity camera look-controls wasd-controls position="0 0 0">
+          <!-- Cursor -->
+          <a-cursor fuse="false" material="color: white; shader: flat"></a-cursor>
+
+          <!-- Ladebalken und Score -->
+          <a-entity position="0 0 -1.5">
+            <a-plane id="progressBar"
+                     height="0.05"
+                     width="0.001"
+                     color="#00FF00"
+                     position="0 -0.1 0"
+                     visible="false">
+            </a-plane>
+
+            <a-text id="scoreText"
+                    value="Punkte: 0"
+                    color="#000000"
+                    align="right"
+                    anchor="right"
+                    width="2"
+                    position="2.7 -1 0"
+                    side="double">
+            </a-text>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+
+      <!-- Sky & Licht -->
+      <a-sky src="360.jpg"></a-sky>
+      <a-light type="ambient" color="#445451"></a-light>
+      <a-light type="point" intensity="2" position="2 4 4"></a-light>
+    </a-scene>
+  </body>
+</html>
